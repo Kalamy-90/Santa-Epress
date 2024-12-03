@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Santa Express</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+
+        canvas {
+            border: 3px solid #4a4e69;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            margin: 20px auto;
+            width: 800px;
+            height: 600px;
+        }
+
+        .menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 2rem;
+            border-radius: 15px;
+            min-width: 300px;
+        }
+
+        .btn {
+            background: #ff9900;
+            border: none;
+            padding: 12px 30px;
+            margin: 10px;
+            border-radius: 25px;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: scale(1.1);
+            background: #ffaa33;
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: none;
+            font-size: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .menu-content {
+            display: none;
+        }
+
+        h1 {
+            color: #ff9900;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="mainMenu" class="menu">
+            <h1>Santa Express</h1>
+            <button class="btn" onclick="startGame()">Jouer</button>
+            <button class="btn" onclick="showSettings()">Paramètres</button>
+        </div>
+
+        <div id="settings" class="menu menu-content">
+            <h2>Paramètres</h2>
+            <div>
+                <label>Difficulté:</label>
+                <select id="difficulty" class="btn">
+                    <option value="easy">Facile</option>
+                    <option value="medium" selected>Normal</option>
+                    <option value="hard">Difficile</option>
+                </select>
+            </div>
+            <button class="btn" onclick="backToMain()">Retour</button>
+        </div>
+
+        <div id="hud">
+            <div id="score">Score: 0</div>
+            <div id="timer">Temps: 60s</div>
+        </div>
+    </div>
+
+    <script>
+        let game = {
+            santa: { x: 100, y: 300, width: 60, height: 40, speed: 5 },
+            presents: [],
+            chimneys: [],
+            obstacles: [],
+            score: 0,
+            timeLeft: 60,
+            isActive: false,
+            keys: {}
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const hud = document.getElementById('hud');
+        let gameLoop;
+
+        function showSettings() {
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('settings').style.display = 'block';
+        }
+
+        function backToMain() {
+            document.getElementById('settings').style.display = 'none';
+            document.getElementById('mainMenu').style.display = 'block';
+        }
+
+        function startGame() {
+            // Initialiser le jeu
+            game.score = 0;
+            game.timeLeft = 60;
+            game.isActive = true;
+            game.presents = [];
+            game.obstacles = [];
+            createChimneys();
+
+            // Cacher le menu et afficher le jeu
+            document.getElementById('mainMenu').style.display = 'none';
+            canvas.style.display = 'block';
+            hud.style.display = 'block';
+
+            // Démarrer les boucles de jeu
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, 1000/60);
+            setInterval(createObstacle, 2000);
+
+            // Démarrer le timer
+            const timerInterval = setInterval(() => {
+                if (!game.isActive) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+                game.timeLeft--;
+                document.getElementById('timer').textContent = `Temps: ${game.timeLeft}s`;
+                if (game.timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function createChimneys() {
+            game.chimneys = [
+                { x: 300, y: 500, width: 40, height: 60 },
+                { x: 500, y: 500, width: 40, height: 60 },
+                { x: 700, y: 500, width: 40, height: 60 }
+            ];
+        }
+
+        function createObstacle() {
+            if (!game.isActive) return;
+            game.obstacles.push({
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 100),
+                width: 30,
+                height: 30,
+                speed: 3
+            });
+        }
+
+        function update() {
+            if (!game.isActive) return;
+
+            // Déplacer le Père Noël
+            if (game.keys.ArrowLeft) game.santa.x -= game.santa.speed;
+            if (game.keys.ArrowRight) game.santa.x += game.santa.speed;
+            if (game.keys.ArrowUp) game.santa.y -= game.santa.speed;
+            if (game.keys.ArrowDown) game.santa.y += game.santa.speed;
+
+            // Limites du canvas
+            game.santa.x = Math.max(0, Math.min(canvas.width - game.santa.width, game.santa.x));
+            game.santa.y = Math.max(0, Math.min(canvas.height - game.santa.height, game.santa.y));
+
+            // Déplacer les cadeaux
+            game.presents.forEach(present => {
+                present.y += 5;
+                // Vérifier si le cadeau touche une cheminée
+                game.chimneys.forEach(chimney => {
+                    if (present.y > chimney.y && 
+                        present.x > chimney.x && 
+                        present.x < chimney.x + chimney.width) {
+                        game.score += 100;
+                        game.presents = game.presents.filter(p => p !== present);
+                        document.getElementById('score').textContent = `Score: ${game.score}`;
+                    }
+                });
+            });
+
+            // Déplacer les obstacles
+            game.obstacles.forEach(obstacle => {
+                obstacle.x -= obstacle.speed;
+                // Collision avec le Père Noël
+                if (collision(game.santa, obstacle)) {
+                    game.timeLeft -= 5;
+                    game.obstacles = game.obstacles.filter(o => o !== obstacle);
+                }
+            });
+
+            // Nettoyer les objets hors écran
+            game.presents = game.presents.filter(present => present.y < canvas.height);
+            game.obstacles = game.obstacles.filter(obstacle => obstacle.x > -obstacle.width);
+
+            draw();
+        }
+
+        function collision(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Fond
+            ctx.fillStyle = '#001f3f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Père Noël
+            ctx.fillStyle = 'red';
+            ctx.fillRect(game.santa.x, game.santa.y, game.santa.width, game.santa.height);
+
+            // Cheminées
+            ctx.fillStyle = '#8B4513';
+            game.chimneys.forEach(chimney => {
+                ctx.fillRect(chimney.x, chimney.y, chimney.width, chimney.height);
+            });
+
+            // Cadeaux
+            ctx.fillStyle = 'green';
+            game.presents.forEach(present => {
+                ctx.fillRect(present.x, present.y, present.width, present.height);
+            });
+
+            // Obstacles
+            ctx.fillStyle = 'white';
+            game.obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function endGame() {
+            game.isActive = false;
+            alert(`Jeu terminé! Score final: ${game.score}`);
+            document.getElementById('mainMenu').style.display = 'block';
+            canvas.style.display = 'none';
+            hud.style.display = 'none';
+        }
+
+        // Événements clavier
+        document.addEventListener('keydown', (e) => {
+            game.keys[e.key] = true;
+            if (e.key === ' ') {
+                game.presents.push({
+                    x: game.santa.x + game.santa.width/2,
+                    y: game.santa.y + game.santa.height,
+                    width: 20,
+                    height: 20
+                });
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            game.keys[e.key] = false;
+        });
+    </script>
+</body>
+</html>
