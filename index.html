@@ -1,558 +1,172 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-  <title>Santa Express</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-    }
-
-    #game-container {
-      width: 800px;
-      height: 600px;
-      border: 1px solid black;
-    }
-
-    #settings-menu {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: white;
-      padding: 20px;
-      border: 1px solid black;
-      display: none;
-    }
-
-    #score {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      font-size: 20px;
-    }
-
-    #start-button {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 10px 20px;
-      background-color: green;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-
-    #stop-button {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 10px 20px;
-      background-color: red;
-      color: white;
-      border: none;
-      cursor: pointer;
-      display: none;
-    }
-
-    #settings-button {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 10px 20px;
-      background-color: blue;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-
-    .settings-label {
-      display: block;
-      margin-bottom: 5px;
-    }
-
-    .settings-input {
-      width: 100%;
-      padding: 5px;
-      margin-bottom: 10px;
-    }
-
-    #save-settings {
-      padding: 10px 20px;
-      background-color: green;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Santa Express</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: url('assets/images/background.png') no-repeat center center fixed;
+            background-size: cover;
+        }
+        #game-container {
+            width: 800px;
+            height: 600px;
+            margin: 20px auto;
+            position: relative;
+            overflow: hidden;
+        }
+        #santa {
+            position: absolute;
+            width: 100px;
+            height: 60px;
+            background: url('assets/images/santa-sleigh.png') no-repeat;
+            background-size: contain;
+        }
+        .present, .chimney, .cloud, .bird, .drone, .star, .snowflake {
+            position: absolute;
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+        .present { background-image: url('assets/images/present.png'); width: 40px; height: 40px; }
+        .chimney { background-image: url('assets/images/chimney.png'); width: 60px; height: 80px; }
+        .cloud { background-image: url('assets/images/cloud.png'); width: 100px; height: 60px; }
+        .bird { background-image: url('assets/images/bird.png'); width: 50px; height: 30px; }
+        .drone { background-image: url('assets/images/drone.png'); width: 40px; height: 40px; }
+        .star { background-image: url('assets/images/star.png'); width: 30px; height: 30px; }
+        .snowflake { background-image: url('assets/images/snowflake.png'); width: 20px; height: 20px; }
+        #menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        #settings {
+            display: none;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
 </head>
 <body>
-  <canvas id="game-container"></canvas>
+    <div id="game-container">
+        <div id="santa"></div>
+    </div>
+    <div id="menu">
+        <button onclick="toggleSettings()">Paramètres</button>
+        <div id="settings">
+            <h3>Paramètres</h3>
+            <label>Volume musique: <input type="range" id="musicVolume" min="0" max="1" step="0.1" value="0.5"></label><br>
+            <label>Volume effets sonores: <input type="range" id="sfxVolume" min="0" max="1" step="0.1" value="0.5"></label><br>
+            <h4>Touches:</h4>
+            <label>Haut: <input type="text" id="upKey" value="ArrowUp"></label><br>
+            <label>Bas: <input type="text" id="downKey" value="ArrowDown"></label><br>
+            <label>Gauche: <input type="text" id="leftKey" value="ArrowLeft"></label><br>
+            <label>Droite: <input type="text" id="rightKey" value="ArrowRight"></label><br>
+            <label>Larguer cadeau: <input type="text" id="dropKey" value=" "></label><br>
+            <button onclick="saveSettings()">Sauvegarder</button>
+        </div>
+    </div>
 
-  <div id="score"></div>
+    <script>
+        const santa = document.getElementById('santa');
+        const gameContainer = document.getElementById('game-container');
+        let santaX = 0;
+        let santaY = 250;
+        const speed = 5;
 
-  <button id="start-button">Démarrer</button>
-  <button id="stop-button">Arrêter</button>
-  <button id="settings-button">Paramètres</button>
+        // Sons
+        const jingleSound = new Audio('assets/sounds/jingle.mp3');
+        const dropSound = new Audio('assets/sounds/drop.mp3');
+        const collectSound = new Audio('assets/sounds/collect.mp3');
+        const crashSound = new Audio('assets/sounds/crash.mp3');
+        const successSound = new Audio('assets/sounds/success.mp3');
 
-  <div id="settings-menu">
-    <label class="settings-label" for="volume-music">Volume de la musique:</label>
-    <input class="settings-input" type="range" id="volume-music" min="0" max="1" step="0.1" value="0.5">
+        // Contrôles
+        let controls = {
+            up: 'ArrowUp',
+            down: 'ArrowDown',
+            left: 'ArrowLeft',
+            right: 'ArrowRight',
+            drop: ' '
+        };
 
-    <label class="settings-label" for="volume-sound-effects">Volume des effets sonores:</label>
-    <input class="settings-input" type="range" id="volume-sound-effects" min="0" max="1" step="0.1" value="0.5">
-
-    <label class="settings-label" for="up">Touche Haut:</label>
-    <input class="settings-input key-binding-input" type="text" id="up" name="up" value="ArrowUp">
-
-    <label class="settings-label" for="down">Touche Bas:</label>
-    <input class="settings-input key-binding-input" type="text" id="down" name="down" value="ArrowDown">
-
-    <label class="settings-label" for="left">Touche Gauche:</label>
-    <input class="settings-input key-binding-input" type="text" id="left" name="left" value="ArrowLeft">
-
-    <label class="settings-label" for="right">Touche Droite:</label>
-    <input class="settings-input key-binding-input" type="text" id="right" name="right" value="ArrowRight">
-
-    <button id="save-settings">Enregistrer</button>
-  </div>
-
-  <script>
-    // Initialisation des variables
-    let gameStarted = false;
-    let score = 0;
-    let volumeMusic = 0.5;
-    let volumeSoundEffects = 0.5;
-    let keyBindings = {
-      up: "ArrowUp",
-      down: "ArrowDown",
-      left: "ArrowLeft",
-      right: "ArrowRight"
-    };
-
-    // Éléments du DOM
-    const gameContainer = document.getElementById("game-container");
-    const scoreDisplay = document.getElementById("score");
-    const settingsMenu = document.getElementById("settings-menu");
-    const volumeMusicSlider = document.getElementById("volume-music");
-    const volumeSoundEffectsSlider = document.getElementById("volume-sound-effects");
-    const keyBindingsInput = document.querySelectorAll(".key-binding-input");
-    const saveSettingsButton = document.getElementById("save-settings");
-    const startButton = document.getElementById("start-button");
-    const stopButton = document.getElementById("stop-button");
-    const settingsButton = document.getElementById("settings-button");
-
-    // Images
-    const santaSleighImage = new Image();
-    santaSleighImage.src = "assets/images/santa-sleigh.png";
-    const presentImage = new Image();
-    presentImage.src = "assets/images/present.png";
-    const chimneyImage = new Image();
-    chimneyImage.src = "assets/images/chimney.png";
-    const cloudImage = new Image();
-    cloudImage.src = "assets/images/cloud.png";
-    const birdImage = new Image();
-    birdImage.src = "assets/images/bird.png";
-    const droneImage = new Image();
-    droneImage.src = "assets/images/drone.png";
-    const starImage = new Image();
-    starImage.src = "assets/images/star.png";
-    const backgroundImage = new Image();
-    backgroundImage.src = "assets/images/background.png";
-    const snowflakeImage = new Image();
-    snowflakeImage.src = "assets/images/snowflake.png";
-
-    // Sons
-    const jingleMusic = new Audio("assets/sounds/jingle.mp3");
-    const dropSound = new Audio("assets/sounds/drop.mp3");
-    const collectSound = new Audio("assets/sounds/collect.mp3");
-    const crashSound = new Audio("assets/sounds/crash.mp3");
-    const successSound = new Audio("assets/sounds/success.mp3");
-
-    // Objets du jeu
-    const santaSleigh = {
-      x: 100,
-      y: 300,
-      width: 50,
-      height: 30,
-      speed: 5
-    };
-
-    const presents = [];
-    const chimneys = [];
-    const stars = [];
-    const clouds = [];
-    const birds = [];
-    const drones = [];
-
-    // Fonction pour dessiner le fond
-    function drawBackground() {
-      gameContainer.getContext("2d").drawImage(backgroundImage, 0, 0);
-    }
-
-    // Fonction pour dessiner un flocon de neige
-    function drawSnowflake(x, y) {
-      gameContainer.getContext("2d").drawImage(snowflakeImage, x, y);
-    }
-
-    // Fonction pour dessiner un nuage
-    function drawCloud(x, y) {
-      gameContainer.getContext("2d").drawImage(cloudImage, x, y);
-    }
-
-    // Fonction pour dessiner un oiseau
-    function drawBird(x, y) {
-      gameContainer.getContext("2d").drawImage(birdImage, x, y);
-    }
-
-    // Fonction pour dessiner un drone
-    function drawDrone(x, y) {
-      gameContainer.getContext("2d").drawImage(droneImage, x, y);
-    }
-
-    // Fonction pour dessiner une étoile
-    function drawStar(x, y) {
-      gameContainer.getContext("2d").drawImage(starImage, x, y);
-    }
-
-    // Fonction pour dessiner un traîneau du Père Noël
-    function drawSantaSleigh(x, y) {
-      gameContainer.getContext("2d").drawImage(santaSleighImage, x, y);
-    }
-
-    // Fonction pour dessiner un cadeau
-    function drawPresent(x, y) {
-      gameContainer.getContext("2d").drawImage(presentImage, x, y);
-    }
-
-    // Fonction pour dessiner une cheminée
-    function drawChimney(x, y) {
-      gameContainer.getContext("2d").drawImage(chimneyImage, x, y);
-    }
-
-    // Fonction pour mettre à jour le score
-    function updateScore() {
-      scoreDisplay.textContent = "Score: " + score;
-    }
-
-    // Fonction pour gérer les collisions
-    function handleCollisions(x, y, width, height) {
-      // Vérifier si le traîneau du Père Noël est en collision avec un obstacle
-      // (par exemple, un drone, un oiseau ou un nuage)
-      drones.forEach(drone => {
-        if (
-          x < drone.x + drone.width &&
-          x + width > drone.x &&
-          y < drone.y + drone.height &&
-          y + height > drone.y
-        ) {
-          crashSound.play();
-          santaSleigh.x = 100;
-          santaSleigh.y = 300;
+        function updateSantaPosition() {
+            santa.style.left = santaX + 'px';
+            santa.style.top = santaY + 'px';
         }
-      });
 
-      birds.forEach(bird => {
-        if (
-          x < bird.x + bird.width &&
-          x + width > bird.x &&
-          y < bird.y + bird.height &&
-          y + height > bird.y
-        ) {
-          crashSound.play();
-          santaSleigh.x = 100;
-          santaSleigh.y = 300;
+        document.addEventListener('keydown', (event) => {
+            switch(event.key) {
+                case controls.up:
+                    if (santaY > 0) santaY -= speed;
+                    break;
+                case controls.down:
+                    if (santaY < gameContainer.offsetHeight - santa.offsetHeight) santaY += speed;
+                    break;
+                case controls.left:
+                    if (santaX > 0) santaX -= speed;
+                    break;
+                case controls.right:
+                    if (santaX < gameContainer.offsetWidth - santa.offsetWidth) santaX += speed;
+                    break;
+                case controls.drop:
+                    dropPresent();
+                    break;
+            }
+            updateSantaPosition();
+        });
+
+        function dropPresent() {
+            const present = document.createElement('div');
+            present.className = 'present';
+            present.style.left = (santaX + santa.offsetWidth / 2) + 'px';
+            present.style.top = (santaY + santa.offsetHeight) + 'px';
+            gameContainer.appendChild(present);
+            dropSound.play();
+            
+            const dropInterval = setInterval(() => {
+                const currentTop = parseInt(present.style.top);
+                if (currentTop < gameContainer.offsetHeight) {
+                    present.style.top = (currentTop + 5) + 'px';
+                } else {
+                    clearInterval(dropInterval);
+                    gameContainer.removeChild(present);
+                }
+            }, 50);
         }
-      });
 
-      clouds.forEach(cloud => {
-        if (
-          x < cloud.x + cloud.width &&
-          x + width > cloud.x &&
-          y < cloud.y + cloud.height &&
-          y + height > cloud.y
-        ) {
-          crashSound.play();
-          santaSleigh.x = 100;
-          santaSleigh.y = 300;
+        function toggleSettings() {
+            const settings = document.getElementById('settings');
+            settings.style.display = settings.style.display === 'none' ? 'block' : 'none';
         }
-      });
-    }
 
-    // Fonction pour gérer les cadeaux
-    function handlePresents(x, y, width, height) {
-      // Vérifier si un cadeau atteint une cheminée
-      presents.forEach((present, index) => {
-        chimneys.forEach(chimney => {
-          if (
-            present.x < chimney.x + chimney.width &&
-            present.x + present.width > chimney.x &&
-            present.y < chimney.y + chimney.height &&
-            present.y + present.height > chimney.y
-          ) {
-            successSound.play();
-            score++;
-            updateScore();
-            presents.splice(index, 1);
-          }
-        });
-      });
-    }
+        function saveSettings() {
+            controls.up = document.getElementById('upKey').value;
+            controls.down = document.getElementById('downKey').value;
+            controls.left = document.getElementById('leftKey').value;
+            controls.right = document.getElementById('rightKey').value;
+            controls.drop = document.getElementById('dropKey').value;
 
-    // Fonction pour gérer les étoiles
-    function handleStars(x, y, width, height) {
-      // Vérifier si le traîneau du Père Noël collecte une étoile
-      stars.forEach((star, index) => {
-        if (
-          x < star.x + star.width &&
-          x + width > star.x &&
-          y < star.y + star.height &&
-          y + height > star.y
-        ) {
-          collectSound.play();
-          score += 10;
-          updateScore();
-          stars.splice(index, 1);
+            jingleSound.volume = document.getElementById('musicVolume').value;
+            dropSound.volume = document.getElementById('sfxVolume').value;
+            collectSound.volume = document.getElementById('sfxVolume').value;
+            crashSound.volume = document.getElementById('sfxVolume').value;
+            successSound.volume = document.getElementById('sfxVolume').value;
+
+            toggleSettings();
         }
-      });
-    }
 
-    // Fonction pour mettre à jour le jeu
-    function updateGame() {
-      // Mettre à jour la position du traîneau du Père Noël en fonction des touches appuyées
-      if (keyBindings.up === "ArrowUp" && santaSleigh.y > 0) {
-        santaSleigh.y -= santaSleigh.speed;
-      }
-      if (keyBindings.down === "ArrowDown" && santaSleigh.y < gameContainer.height - santaSleigh.height) {
-        santaSleigh.y += santaSleigh.speed;
-      }
-      if (keyBindings.left === "ArrowLeft" && santaSleigh.x > 0) {
-        santaSleigh.x -= santaSleigh.speed;
-      }
-      if (keyBindings.right === "ArrowRight" && santaSleigh.x < gameContainer.width - santaSleigh.width) {
-        santaSleigh.x += santaSleigh.speed;
-      }
+        // Démarrage du jeu
+        jingleSound.loop = true;
+        jingleSound.play();
+        updateSantaPosition();
 
-      // Dessiner le fond et tous les éléments du jeu
-      gameContainer.getContext("2d").clearRect(0, 0, gameContainer.width, gameContainer.height);
-      drawBackground();
-
-      // Dessiner les flocons de neige
-      for (let i = 0; i < 50; i++) {
-        drawSnowflake(Math.random() * gameContainer.width, Math.random() * gameContainer.height);
-      }
-
-      // Dessiner les nuages
-      clouds.forEach(cloud => {
-        drawCloud(cloud.x, cloud.y);
-      });
-
-      // Dessiner les oiseaux
-      birds.forEach(bird => {
-        drawBird(bird.x, bird.y);
-      });
-
-      // Dessiner les drones
-      drones.forEach(drone => {
-        drawDrone(drone.x, drone.y);
-      });
-
-      // Dessiner les étoiles
-      stars.forEach(star => {
-        drawStar(star.x, star.y);
-      });
-
-      // Dessiner les cadeaux
-      presents.forEach(present => {
-        drawPresent(present.x, present.y);
-      });
-
-      // Dessiner les cheminées
-      chimneys.forEach(chimney => {
-        drawChimney(chimney.x, chimney.y);
-      });
-
-      // Dessiner le traîneau du Père Noël
-      drawSantaSleigh(santaSleigh.x, santaSleigh.y);
-
-      // Gérer les collisions
-      handleCollisions(santaSleigh.x, santaSleigh.y, santaSleigh.width, santaSleigh.height);
-
-      // Gérer les cadeaux
-      handlePresents(santaSleigh.x, santaSleigh.y, santaSleigh.width, santaSleigh.height);
-
-      // Gérer les étoiles
-      handleStars(santaSleigh.x, santaSleigh.y, santaSleigh.width, santaSleigh.height);
-
-      // Mettre à jour le score
-      updateScore();
-
-      // Continuer la boucle de jeu
-      requestAnimationFrame(updateGame);
-    }
-
-    // Fonction pour démarrer le jeu
-    function startGame() {
-      gameStarted = true;
-      // Initialiser le jeu
-      jingleMusic.play();
-      jingleMusic.volume = volumeMusic;
-
-      // Générer des cadeaux
-      for (let i = 0; i < 10; i++) {
-        presents.push({
-          x: Math.random() * gameContainer.width,
-          y: 0,
-          width: 30,
-          height: 30
-        });
-      }
-
-      // Générer des cheminées
-      for (let i = 0; i < 5; i++) {
-        chimneys.push({
-          x: Math.random() * gameContainer.width,
-          y: gameContainer.height - 100,
-          width: 40,
-          height: 80
-        });
-      }
-
-      // Générer des étoiles
-      for (let i = 0; i < 20; i++) {
-        stars.push({
-          x: Math.random() * gameContainer.width,
-          y: Math.random() * gameContainer.height,
-          width: 20,
-          height: 20
-        });
-      }
-
-      // Générer des nuages
-      for (let i = 0; i < 5; i++) {
-        clouds.push({
-          x: Math.random() * gameContainer.width,
-          y: Math.random() * gameContainer.height / 2,
-          width: 100,
-          height: 50
-        });
-      }
-
-      // Générer des oiseaux
-      for (let i = 0; i < 10; i++) {
-        birds.push({
-          x: Math.random() * gameContainer.width,
-          y: Math.random() * gameContainer.height / 2,
-          width: 30,
-          height: 20
-        });
-      }
-
-      // Générer des drones
-      for (let i = 0; i < 5; i++) {
-        drones.push({
-          x: Math.random() * gameContainer.width,
-          y: Math.random() * gameContainer.height / 2,
-          width: 40,
-          height: 30
-        });
-      }
-
-      // Démarrer la boucle de jeu
-      requestAnimationFrame(updateGame);
-    }
-
-    // Fonction pour arrêter le jeu
-    function stopGame() {
-      gameStarted = false;
-      // Arrêter la boucle de jeu
-      jingleMusic.pause();
-    }
-
-    // Fonction pour gérer les événements des touches
-    function handleKeypress(event) {
-      if (gameStarted) {
-        // Mettre à jour la position du traîneau du Père Noël en fonction de la touche appuyée
-        // ...
-      }
-    }
-
-    // Fonction pour gérer les événements du curseur du volume de la musique
-    function handleVolumeMusicChange(event) {
-      volumeMusic = event.target.value;
-      jingleMusic.volume = volumeMusic;
-    }
-
-    // Fonction pour gérer les événements du curseur du volume des effets sonores
-    function handleVolumeSoundEffectsChange(event) {
-      volumeSoundEffects = event.target.value;
-      dropSound.volume = volumeSoundEffects;
-      collectSound.volume = volumeSoundEffects;
-      crashSound.volume = volumeSoundEffects;
-      successSound.volume = volumeSoundEffects;
-    }
-
-    // Fonction pour gérer les événements de changement des touches
-    function handleKeyBindingChange(event) {
-      // Mettre à jour les touches du jeu
-      keyBindings[event.target.name] = event.target.value;
-    }
-
-    // Fonction pour enregistrer les paramètres
-    function saveSettings() {
-      // Enregistrer les paramètres du jeu
-      // ...
-      settingsMenu.style.display = "none";
-    }
-
-    // Événements
-    window.addEventListener("keydown", handleKeypress);
-    volumeMusicSlider.addEventListener("input", handleVolumeMusicChange);
-    volumeSoundEffectsSlider.addEventListener("input", handleVolumeSoundEffectsChange);
-    keyBindingsInput.forEach(input => input.addEventListener("change", handleKeyBindingChange));
-    saveSettingsButton.addEventListener("click", saveSettings);
-    startButton.addEventListener("click", startGame);
-    stopButton.addEventListener("click", stopGame);
-    settingsButton.addEventListener("click", () => {
-      settingsMenu.style.display = "block";
-    });
-
-    // Fonction pour initialiser le jeu
-    function initGame() {
-      // Dessiner le fond du jeu
-      drawBackground();
-      // Dessiner les flocons de neige
-      // ...
-      // Dessiner les nuages
-      // ...
-      // Dessiner les oiseaux
-      // ...
-      // Dessiner les drones
-      // ...
-      // Dessiner les étoiles
-      // ...
-      // Dessiner les cadeaux
-      // ...
-      // Dessiner les cheminées
-      // ...
-      // Dessiner le traîneau du Père Noël
-      // ...
-    }
-
-    // Fonction pour ouvrir le menu des paramètres
-    function openSettingsMenu() {
-      settingsMenu.style.display = "block";
-    }
-
-    // Fonction pour fermer le menu des paramètres
-    function closeSettingsMenu() {
-      settingsMenu.style.display = "none";
-    }
-
-    // Initialisation du jeu
-    initGame();
-  </script>
+        // Ici, vous pouvez ajouter des fonctions pour générer des obstacles, des étoiles, etc.
+        // ainsi que la logique pour détecter les collisions et gérer le score.
+    </script>
 </body>
 </html>
