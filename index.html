@@ -233,7 +233,217 @@
         </div>
     </div>
 
-    <!-- Script du jeu -->
-    <script src="game.js"></script>
-</body>
-</html>
+    <script>
+        // Configuration du jeu
+        const config = {
+            controls: {
+                up: 'ArrowUp',
+                down: 'ArrowDown',
+                left: 'ArrowLeft',
+                right: 'ArrowRight',
+                drop: ' '
+            },
+            audio: {
+                music: null,
+                effects: {
+                    drop: null,
+                    collect: null,
+                    crash: null,
+                    success: null
+                }
+            },
+            volumes: {
+                music: 0.5,
+                sfx: 0.7
+            }
+        };
+
+        // Chargement des images
+        const images = {
+            santa: loadImage('assets/images/santa-sleigh.png'),
+            present: loadImage('assets/images/present.png'),
+            chimney: loadImage('assets/images/chimney.png'),
+            cloud: loadImage('assets/images/cloud.png'),
+            bird: loadImage('assets/images/bird.png'),
+            drone: loadImage('assets/images/drone.png'),
+            star: loadImage('assets/images/star.png'),
+            background: loadImage('assets/images/background.png'),
+            snowflake: loadImage('assets/images/snowflake.png')
+        };
+
+        function loadImage(src) {
+            const img = new Image();
+            img.src = src;
+            return img;
+        }
+
+        // Chargement des sons
+        function loadSounds() {
+            config.audio.music = new Audio('assets/sounds/jingle.mp3');
+            config.audio.music.loop = true;
+            
+            config.audio.effects = {
+                drop: new Audio('assets/sounds/drop.mp3'),
+                collect: new Audio('assets/sounds/collect.mp3'),
+                crash: new Audio('assets/sounds/crash.mp3'),
+                success: new Audio('assets/sounds/success.mp3')
+            };
+        }
+
+        // Variables globales du jeu
+        let game = {
+            canvas: null,
+            ctx: null,
+            width: 800,
+            height: 600,
+            running: false,
+            score: 0,
+            timeLeft: 60,
+            lastTime: 0,
+            player: null,
+            presents: [],
+            chimneys: [],
+            obstacles: [],
+            stars: [],
+            snowflakes: [],
+            difficultySettings: {
+                easy: { speed: 1, obstacleRate: 0.5, starRate: 0.8 },
+                medium: { speed: 1.5, obstacleRate: 0.7, starRate: 0.6 },
+                hard: { speed: 2, obstacleRate: 1, starRate: 0.4 }
+            }
+        };
+
+        // Classe joueur (Père Noël)
+        class Player {
+            constructor() {
+                this.x = 100;
+                this.y = game.height / 2;
+                this.width = 80;
+                this.height = 60;
+                this.speed = 5;
+                this.presentCooldown = 0;
+            }
+
+            update() {
+                if (keys[config.controls.up]) this.y = Math.max(0, this.y - this.speed);
+                if (keys[config.controls.down]) this.y = Math.min(game.height - this.height, this.y + this.speed);
+                if (keys[config.controls.left]) this.x = Math.max(0, this.x - this.speed);
+                if (keys[config.controls.right]) this.x = Math.min(game.width - this.width, this.x + this.speed);
+                
+                if (this.presentCooldown > 0) this.presentCooldown--;
+            }
+
+            draw() {
+                game.ctx.drawImage(images.santa, this.x, this.y, this.width, this.height);
+            }
+
+            dropPresent() {
+                if (this.presentCooldown === 0) {
+                    game.presents.push(new Present(this.x, this.y + this.height / 2));
+                    playSound('drop');
+                    this.presentCooldown = 20;
+                }
+            }
+
+            checkCollision(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            }
+        }
+
+        // Classe cadeau
+        class Present {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+                this.speed = 3;
+                this.falling = true;
+            }
+
+            update() {
+                if (this.falling) {
+                    this.y += this.speed;
+                    if (this.y > game.height) {
+                        return false;
+                    }
+                    
+                    for (let chimney of game.chimneys) {
+                        if (this.checkCollision(chimney)) {
+                            game.score += 100;
+                            playSound('success');
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            draw() {
+                game.ctx.drawImage(images.present, this.x, this.y, this.width, this.height);
+            }
+
+            checkCollision(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            }
+        }
+
+        // Classe cheminée
+        class Chimney {
+            constructor() {
+                this.width = 60;
+                this.height = 80;
+                this.x = game.width;
+                this.y = game.height - this.height;
+            }
+
+            update() {
+                this.x -= 2;
+                return this.x + this.width > 0;
+            }
+
+            draw() {
+                game.ctx.drawImage(images.chimney, this.x, this.y, this.width, this.height);
+            }
+        }
+
+        // Classe obstacle
+        class Obstacle {
+            constructor() {
+                this.width = 40;
+                this.height = 40;
+                this.x = game.width;
+                this.y = Math.random() * (game.height - this.height);
+                this.type = Math.random() < 0.5 ? 'bird' : 'drone';
+                this.speed = this.type === 'bird' ? 3 : 4;
+            }
+
+            update() {
+                this.x -= this.speed;
+                
+                if (this.type === 'bird') {
+                    this.y += Math.sin(this.x / 30) * 2;
+                }
+                
+                if (game.player.checkCollision(this)) {
+                    game.score = Math.max(0, game.score - 50);
+                    playSound('crash');
+                    return false;
+                }
+                
+                return this.x + this.width > 0;
+            }
+
+            draw() {
+                const image = this.type === 'bird' ? images.bird : images.drone;
+                game.ctx.drawImage(image, this.x, this.y, this.width, this.height);
+            }
+        }
+
+        // Classe étoile
