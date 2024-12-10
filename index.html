@@ -103,15 +103,9 @@
             font-size: 1.1em;
         }
 
-        .setting-item select,
-        .setting-item input {
+        .setting-item input[type="range"] {
             width: 100%;
-            padding: 8px;
-            background: #2a1f3f;
-            border: 2px solid #c41e3a;
-            color: white;
-            border-radius: 5px;
-            font-size: 1em;
+            margin: 10px 0;
         }
 
         .key-binding {
@@ -129,27 +123,18 @@
             cursor: pointer;
         }
 
-        .snowflake {
-            position: fixed;
-            color: white;
-            pointer-events: none;
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-            animation: fall linear forwards;
+        #instructions {
+            text-align: left;
+            margin-top: 20px;
         }
 
-        @keyframes fall {
-            to {
-                transform: translateY(100vh);
-            }
+        #instructions ul {
+            list-style-type: none;
+            padding-left: 20px;
         }
 
-        #volume-controls {
-            margin: 20px 0;
-        }
-
-        .volume-slider {
-            width: 100%;
-            margin: 10px 0;
+        #instructions li {
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -162,35 +147,21 @@
             <button class="btn" onclick="startGame()">Jouer</button>
             <button class="btn" onclick="showSettings()">Paramètres</button>
             <button class="btn" onclick="showControls()">Contrôles</button>
+            <button class="btn" onclick="showInstructions()">Instructions</button>
         </div>
 
         <div id="settings" class="menu menu-content">
             <h2>⚙️ Paramètres</h2>
-            <div class="setting-item">
-                <label>Difficulté:</label>
-                <select id="difficulty">
-                    <option value="easy">Facile</option>
-                    <option value="medium" selected>Normal</option>
-                    <option value="hard">Difficile</option>
-                </select>
-            </div>
-
             <div id="volume-controls">
                 <div class="setting-item">
-                    <label>Musique:</label>
-                    <input type="range" id="musicVolume" class="volume-slider" min="0" max="100" value="50">
+                    <label for="musicVolume">Musique:</label>
+                    <input type="range" id="musicVolume" min="0" max="100" value="50">
                 </div>
                 <div class="setting-item">
-                    <label>Effets sonores:</label>
-                    <input type="range" id="sfxVolume" class="volume-slider" min="0" max="100" value="70">
+                    <label for="sfxVolume">Effets sonores:</label>
+                    <input type="range" id="sfxVolume" min="0" max="100" value="70">
                 </div>
             </div>
-
-            <div class="setting-item">
-                <label>Vitesse de jeu:</label>
-                <input type="range" id="gameSpeed" min="1" max="3" step="0.1" value="1.5">
-            </div>
-
             <button class="btn" onclick="backToMain()">Retour</button>
         </div>
 
@@ -219,14 +190,26 @@
             <button class="btn" onclick="backToMain()">Retour</button>
         </div>
 
+        <div id="instructions" class="menu menu-content">
+            <h2>📖 Instructions</h2>
+            <ul>
+                <li>Déplacez le traîneau pour attraper les cadeaux.</li>
+                <li>Évitez les obstacles (oiseaux et drones).</li>
+                <li>Lâchez les cadeaux dans les cheminées.</li>
+                <li>Collectez les étoiles pour vous protéger des obstacles.</li>
+                <li>Livrez le plus de cadeaux possible avant la fin du temps!</li>
+            </ul>
+            <button class="btn" onclick="backToMain()">Retour</button>
+        </div>
+
         <div id="hud">
             <div id="score">🎁 Score: 0</div>
             <div id="timer">⏰ Temps: 60s</div>
+            <div id="presents">🎁 Cadeaux: 0</div>
         </div>
     </div>
 
     <script>
-        // Configuration du jeu
         const config = {
             controls: {
                 up: 'ArrowUp',
@@ -250,7 +233,6 @@
             }
         };
 
-        // Chargement des images
         const images = {
             santa: loadImage('assets/images/santa-sleigh.png'),
             present: loadImage('assets/images/present.png'),
@@ -269,7 +251,6 @@
             return img;
         }
 
-        // Chargement des sons
         function loadSounds() {
             config.audio.music = new Audio('assets/sounds/jingle.mp3');
             config.audio.music.loop = true;
@@ -282,7 +263,6 @@
             };
         }
 
-        // Mise à jour des volumes
         function updateVolumes() {
             config.volumes.music = document.getElementById('musicVolume').value / 100;
             config.volumes.sfx = document.getElementById('sfxVolume').value / 100;
@@ -293,7 +273,6 @@
             });
         }
 
-        // Fonction pour changer les contrôles
         function changeKey(action) {
             const button = event.target;
             button.textContent = 'Appuyez sur une touche...';
@@ -310,10 +289,9 @@
 
         let game, canvas, ctx, gameLoop;
 
-        // Initialisation du jeu
         function initGame() {
             game = {
-                santa: { x: 100, y: 300, width: 80, height: 60, speed: 5 },
+                santa: { x: 100, y: 300, width: 80, height: 60, speed: 5, presents: 0 },
                 presents: [],
                 chimneys: [],
                 obstacles: [],
@@ -321,7 +299,8 @@
                 score: 0,
                 timeLeft: 60,
                 isActive: false,
-                keys: {}
+                keys: {},
+                hasShield: false
             };
             createChimneys();
             updateVolumes();
@@ -345,6 +324,17 @@
                 height: 40,
                 speed: 3,
                 type: type
+            });
+        }
+
+        function createPresent() {
+            if (!game.isActive) return;
+            game.presents.push({
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 100),
+                width: 40,
+                height: 40,
+                speed: 2
             });
         }
 
@@ -374,23 +364,19 @@
 
             // Déplacer les cadeaux
             game.presents.forEach(present => {
-                present.y += 5;
-                // Vérifier si le cadeau touche une cheminée
-                game.chimneys.forEach(chimney => {
-                    if (collision(present, chimney)) {
-                        game.score += 100;
-                        game.presents = game.presents.filter(p => p !== present);
-                        playSound('success');
-                        updateScore();
-                    }
-                });
+                present.x -= present.speed;
+                if (collision(game.santa, present)) {
+                    game.santa.presents++;
+                    game.presents = game.presents.filter(p => p !== present);
+                    playSound('collect');
+                    updatePresents();
+                }
             });
 
             // Déplacer les obstacles
             game.obstacles.forEach(obstacle => {
                 obstacle.x -= obstacle.speed;
-                // Collision avec le Père Noël
-                if (collision(game.santa, obstacle)) {
+                if (collision(game.santa, obstacle) && !game.hasShield) {
                     game.timeLeft -= 5;
                     game.obstacles = game.obstacles.filter(o => o !== obstacle);
                     playSound('crash');
@@ -401,15 +387,15 @@
             game.stars.forEach(star => {
                 star.y += star.speed;
                 if (collision(game.santa, star)) {
-                    game.score += 50;
+                    game.hasShield = true;
                     game.stars = game.stars.filter(s => s !== star);
                     playSound('collect');
-                    updateScore();
+                    setTimeout(() => { game.hasShield = false; }, 5000);
                 }
             });
 
             // Nettoyer les objets hors écran
-            game.presents = game.presents.filter(present => present.y < canvas.height);
+            game.presents = game.presents.filter(present => present.x > -present.width);
             game.obstacles = game.obstacles.filter(obstacle => obstacle.x > -obstacle.width);
             game.stars = game.stars.filter(star => star.y < canvas.height);
 
@@ -419,39 +405,40 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Fond
             ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height);
 
-            // Cheminées
             game.chimneys.forEach(chimney => {
                 ctx.drawImage(images.chimney, chimney.x, chimney.y, chimney.width, chimney.height);
             });
 
-            // Cadeaux
             game.presents.forEach(present => {
                 ctx.drawImage(images.present, present.x, present.y, present.width, present.height);
             });
 
-            // Obstacles
             game.obstacles.forEach(obstacle => {
                 ctx.drawImage(images[obstacle.type], obstacle.x, obstacle.y, obstacle.width, obstacle.height);
             });
 
-            // Étoiles
             game.stars.forEach(star => {
                 ctx.drawImage(images.star, star.x, star.y, star.width, star.height);
             });
 
-            // Père Noël
             ctx.drawImage(images.santa, game.santa.x, game.santa.y, game.santa.width, game.santa.height);
 
-            // Flocons de neige (effet visuel)
+            if (game.hasShield) {
+                ctx.beginPath();
+                ctx.arc(game.santa.x + game.santa.width / 2, game.santa.y + game.santa.height / 2, 
+                        Math.max(game.santa.width, game.santa.height) / 2 + 10, 0, Math.PI * 2);
+                ctx.strokeStyle = 'gold';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
             drawSnowflakes();
         }
 
         function drawSnowflakes() {
-            // Ajoutez ici la logique pour dessiner des flocons de neige en mouvement
-            // Utilisez images.snowflake pour les dessiner
+            // Implémentez ici la logique pour dessiner les flocons de neige
         }
 
         function startGame() {
@@ -464,7 +451,8 @@
             if (gameLoop) clearInterval(gameLoop);
             gameLoop = setInterval(update, 1000/60);
             setInterval(createObstacle, 2000);
-            setInterval(createStar, 5000);
+            setInterval(createPresent, 3000);
+            setInterval(createStar, 10000);
 
             playMusic();
             startTimer();
@@ -498,6 +486,10 @@
             document.getElementById('score').textContent = `🎁 Score: ${game.score}`;
         }
 
+        function updatePresents() {
+            document.getElementById('presents').textContent = `🎁 Cadeaux: ${game.santa.presents}`;
+        }
+
         function startTimer() {
             const timerInterval = setInterval(() => {
                 if (!game.isActive) {
@@ -510,17 +502,19 @@
             }, 1000);
         }
 
-        // Événements clavier
         document.addEventListener('keydown', (e) => {
             game.keys[e.key] = true;
-            if (e.key === config.controls.drop && game.isActive) {
-                game.presents.push({
-                    x: game.santa.x + game.santa.width/2 - 10,
-                    y: game.santa.y + game.santa.height,
-                    width: 20,
-                    height: 20
+            if (e.key === config.controls.drop && game.isActive && game.santa.presents > 0) {
+                game.chimneys.forEach(chimney => {
+                    if (game.santa.x < chimney.x + chimney.width &&
+                        game.santa.x + game.santa.width > chimney.x) {
+                        game.santa.presents--;
+                        game.score += 100;
+                        playSound('drop');
+                        updateScore();
+                        updatePresents();
+                    }
                 });
-                playSound('drop');
             }
         });
 
@@ -528,7 +522,6 @@
             game.keys[e.key] = false;
         });
 
-        // Fonction utilitaire pour détecter les collisions
         function collision(obj1, obj2) {
             return obj1.x < obj2.x + obj2.width &&
                    obj1.x + obj1.width > obj2.x &&
@@ -546,17 +539,24 @@
             document.getElementById('controls').style.display = 'block';
         }
 
+        function showInstructions() {
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('instructions').style.display = 'block';
+        }
+
         function backToMain() {
             document.getElementById('settings').style.display = 'none';
             document.getElementById('controls').style.display = 'none';
+            document.getElementById('instructions').style.display = 'none';
             document.getElementById('mainMenu').style.display = 'block';
         }
 
-        // Initialisation
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
             loadSounds();
+            document.getElementById('musicVolume').addEventListener('input', updateVolumes);
+            document.getElementById('sfxVolume').addEventListener('input', updateVolumes);
         };
     </script>
 </body>
